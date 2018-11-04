@@ -8,33 +8,47 @@ import pandas as pd
 import numpy as np
 
 class met:
-    def __init__(self,bins=None):
+    def __init__(self,bins=None,breaks=5):
         self.bins=bins if bins is None else bins
         self.stat=None 
         self.iv=None
-        self.breaks=5
+        self.breaks=breaks
+        self.name=None
 
     def fit(self,x,y):
         '''Fitting Information'''
         x = pd.Series(x)
         y = pd.Series(y)
+        self.name=x.name
         df = pd.DataFrame({"X": x, "Y": y, 'order': np.arange(x.size)})
         
+#        bins=[]
+#        bins.append(-float('Inf'))
+#        
+#        breaks = self.breaks
+#        br=1/breaks
+#        quant=list(np.arange(br, 1+br, br))
+#        
+#        cuts=df['X'].dropna().quantile(quant)
+#        cuts=list(cuts)
+#        
+#        for i in cuts:
+#            bins.append(i)
+#
+#        bins.append(float('Inf'))
+#        self.bins=bins
+        #cuts,
+        breaks=pd.qcut(df["X"],self.breaks,retbins=True)[1]
         bins=[]
         bins.append(-float('Inf'))
-        
-        breaks = self.breaks
-        br=1/breaks
-        quant=list(np.arange(br, 1+br, br))
-        
-        cuts=df['X'].dropna().quantile(quant)
-        cuts=list(cuts)
-        
-        for i in cuts:
+        for i in breaks[1:self.breaks]:
             bins.append(i)
-
+        #self.bins=bins
         bins.append(float('Inf'))
         self.bins=bins
+        #self.bins = np.append((-float("inf"),), bins[1:-1])
+        #self.bins=np.append(float('Inf'))
+        #cuts, bins = pd.qcut(df["X"],16, retbins=True, labels=False)
         q = pd.cut(df['X'], bins=self.bins)
         df['labels']=q.astype(str)
         col_names = {'count_nonzero': 'bad', 'size': 'obs'}
@@ -45,43 +59,20 @@ class met:
         self.stat['woe'] = np.log(self.stat['good_perc'].values/self.stat['bad_perc'].values)
         self.stat['iv']= (self.stat['good_perc']-self.stat['bad_perc'])*self.stat['woe']
         self.iv=sum(self.stat['iv'])
-        return quant
+       # return quant
     
     def deploy(self,df):
         ''' Deploy of bins '''
-        q = pd.cut(df['Age'],bins=self.bins)
-        return q  
-
-
-
-dataset[dataset['EstimatedSalary']<=15000]
+        labels = pd.cut(df[self.name],bins=self.bins)
+        return labels  
 
 
 m = met()
-#m.deploy(dataset)
 m.fit(dataset['EstimatedSalary'],dataset['Purchased'])
 m.stat
+m.iv
+m.bins
 
-
-a=m.bins.values
-np.concatenate([np.array(),np.array(a)])
-m.stat
-a=list(a)
-a.append(-float('Inf'))
-a.append(float('Inf'))
-
-ee=[]
-ee.append(-float('Inf'))
-ee.append(list(m.bins))
-
-qq=m.deploy(dataset)
-
-y=Training[['flag_bm','END_NUM_DECREM_SALDO_U24M']]
-q = pd.cut(y['END_NUM_DECREM_SALDO_U24M'], bins=[-float("inf"),8,float("inf")])
-q = pd.cut(y['END_NUM_DECREM_SALDO_U24M'], bins=10)
-y['labels']=q
-col_names = {'count_nonzero': 'bad', 'size': 'obs'}
-stat = y.groupby("labels")['flag_bm'].agg([np.mean, np.count_nonzero, np.size]).rename(columns=col_names)
-qnt_num = int(pd.minimum(Training['END_NUM_DECREM_SALDO_U24M'].unique().size / 16, 10)) + 1
+dataset['deploy']=m.deploy(datase
 
 
