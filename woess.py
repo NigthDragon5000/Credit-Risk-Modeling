@@ -73,6 +73,6 @@ m.stat
 m.iv
 m.bins
 
-dataset['deploy']=m.deploy(datase
+dataset['deploy']=m.deploy(dataset)
 
 
