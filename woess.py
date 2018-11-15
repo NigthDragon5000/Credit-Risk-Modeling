@@ -1,7 +1,7 @@
 """
 Created on Sat Nov  3 10:13:22 2018
 
-@author: pc
+@author: Jair Condori
 """
 import pandas as pd
 import numpy as np
@@ -17,13 +17,17 @@ class woe:
         self.woe=None
         self.df=None
 
+
     def fit(self,x,y):
         '''Fitting Information'''
         if not isinstance(x, pd.Series):
             x = pd.Series(x.compute())
         if not isinstance(y, pd.Series):
             y = pd.Series(y.compute())
+            
         self.name=x.name
+                        
+        
         df = pd.DataFrame({"X": x, "Y": y, 'order': np.arange(x.size)})
         
         if self.bins is None:
@@ -73,8 +77,8 @@ class woe:
     def optimize(self,depth=2,criterion='gini'):
         clf = DecisionTreeClassifier(criterion='gini',random_state=0,
                                      max_depth=depth)
-        
-        clf.fit(self.df['X'][:, None],self.df['Y'])
+        df=self.df.dropna()
+        clf.fit(df['X'][:, None],df['Y'])
         breaks=clf.tree_.threshold[clf.tree_.threshold>-2]
         breaks=sorted(breaks)
         bins=[]
@@ -84,3 +88,30 @@ class woe:
         bins.append(float('Inf'))
         self.bins=bins
         self.fit(self.df['X'],self.df['Y'])
+        
+
+    def massive(self,df,y_name):
+     iv = []
+     names=[]
+    
+     for column in df.columns: 
+      try:
+          self.fit(df[column],df[y_name])
+          ivs=self.iv
+          self.bins=None
+      except KeyboardInterrupt:
+          raise Exception('Stop by user')
+      except: 
+          ivs=0      
+      names.append(column)
+      iv.append(ivs)
+
+     iv=np.array(iv)
+     iv=np.transpose(iv)
+     names=np.array(names)
+     names=np.transpose(names)
+     massive=np.concatenate((iv.reshape(-1,1),names.reshape(-1,1)),axis=1)
+     ivss = pd.DataFrame({'iv':massive[:,0],'names':massive[:,1]})
+     ivss['iv']=ivss['iv'].astype(float)
+     ivss.plot(kind='bar',x='names',y='iv',color='red')
+     return(ivss)
