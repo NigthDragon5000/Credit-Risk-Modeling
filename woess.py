@@ -3,6 +3,8 @@ Created on Sat Nov  3 10:13:22 2018
 
 @author: Jair Condori
 """
+
+
 import pandas as pd
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
@@ -41,18 +43,23 @@ class woe:
            self.bins=bins
            
         q = pd.cut(df['X'], bins=self.bins,
-                   labels=np.arange(len(self.bins)-1).astype(str))
+                   labels=np.arange(len(self.bins)-1).astype(int))
         df['labels']=q.astype(str)
-        q = pd.cut(df['X'], bins=self.bins)
-        df['range']=q.astype(str)
+       # q = pd.cut(df['X'], bins=self.bins)
+       # df['range']=q.astype(str)
         col_names = {'count_nonzero': 'bad', 'size': 'obs'}
-        self.stat = df.groupby(["labels","range"])['Y'].agg([np.mean, np.count_nonzero, np.size]).rename(columns=col_names).copy()  
+        #self.stat = df.groupby(["labels","range"])['Y'].agg([np.mean, np.count_nonzero, np.size]).rename(columns=col_names).copy()  
+        self.stat = df.groupby(["labels"])['Y'].agg([np.mean, np.count_nonzero, np.size]).rename(columns=col_names).copy()
         self.stat['bad_perc']=self.stat['bad']/sum(self.stat['bad'])
         self.stat['good']=self.stat['obs']-self.stat['bad']
         self.stat['good_perc']=self.stat['good']/sum(self.stat['good'])
         self.stat['woe'] = np.log(self.stat['good_perc'].values/self.stat['bad_perc'].values)
-        self.stat['iv']= (self.stat['good_perc']-self.stat['bad_perc'])*self.stat['woe']
-        self.iv=sum(self.stat['iv'])
+        self.stat['iv']= (self.stat['good_perc']-self.stat['bad_perc'])*self.stat['woe']               
+        self.stat['index'] = self.stat.index
+        self.stat['index'] = pd.to_numeric(self.stat['index'])
+        self.stat=self.stat.sort_values('index')
+        self.stat['breaks']=self.bins[1:len(self.bins)]
+        self.iv=sum(self.stat['iv']) 
         self.df=df
                 
     
@@ -70,9 +77,9 @@ class woe:
         return labels  
     
     def plot(self):
-        self.stat['index'] = self.stat.index
+        #self.stat['index'] = self.stat.index
         ''' Plot in function of bad rate'''
-        return self.stat.plot(kind='bar',x='index',y='mean',color='blue')
+        return self.stat.plot(kind='bar',x='breaks',y='mean',color='blue')
     
     def optimize(self,depth=2,criterion='gini'):
         clf = DecisionTreeClassifier(criterion='gini',random_state=0,
@@ -89,7 +96,7 @@ class woe:
         self.bins=bins
         self.fit(self.df['X'],self.df['Y'])
         
-
+       
     def massive(self,df,y_name):
      iv = []
      names=[]
@@ -115,3 +122,11 @@ class woe:
      ivss['iv']=ivss['iv'].astype(float)
      ivss.plot(kind='bar',x='names',y='iv',color='red')
      return(ivss)
+     
+    def _checkMonotonic(self):
+        bins=np.asarray(self.stat['mean'].values)
+        if self.df['X'].isnull().values.any():
+            bins=bins[0:len(bins)-1]
+        return np.all(np.diff(bins) > 0) or  np.all(np.diff(bins) < 0)
+
+
