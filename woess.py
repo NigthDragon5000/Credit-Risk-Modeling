@@ -28,8 +28,7 @@ class woe:
             y = pd.Series(y.compute())
             
         self.name=x.name
-                        
-        
+                           
         df = pd.DataFrame({"X": x, "Y": y, 'order': np.arange(x.size)})
         
         if self.bins is None:
@@ -56,23 +55,40 @@ class woe:
         self.stat['woe'] = np.log(self.stat['good_perc'].values/self.stat['bad_perc'].values)
         self.stat['iv']= (self.stat['good_perc']-self.stat['bad_perc'])*self.stat['woe']               
         self.stat['index'] = self.stat.index
+        NA=self.stat[self.stat['index'] =='nan']
+        self.stat=self.stat[self.stat['index'] !='nan']
         self.stat['index'] = pd.to_numeric(self.stat['index'])
         self.stat=self.stat.sort_values('index')
         self.stat['breaks']=self.bins[1:len(self.bins)]
+        self.stat=pd.concat([self.stat,NA],sort=True)
         self.iv=sum(self.stat['iv']) 
         self.df=df
-                
+     
     
     def deploy(self,df):
         ''' Deploy of bins '''
 
         if not isinstance(df[self.name], pd.Series):
             x = pd.Series(df[self.name].compute())
-            labels = pd.cut(x,bins=self.bins,
+            if x.isnull().values.any():
+                labels = pd.cut(x,bins=self.bins,
+                        labels=self.stat['woe'].tolist()[0:-1])
+                labels=labels.astype(float)
+                labels[labels.isnull()] =self.stat['woe'].tolist()[-1]
+            else:                
+                labels = pd.cut(x,bins=self.bins,
                         labels=self.stat['woe'].tolist())
-        if  isinstance(df[self.name], pd.Series):
-             labels = pd.cut(df[self.name],bins=self.bins,
+                labels=labels.astype(float)
+        if isinstance(df[self.name], pd.Series):
+            if self.df['X'].isnull().values.any():
+                labels = pd.cut(df[self.name],bins=self.bins,
+                        labels=self.stat['woe'].tolist()[0:-1])
+                labels=labels.astype(float)
+                labels[labels.isnull()] =self.stat['woe'].tolist()[-1]
+            else:                
+                labels = pd.cut(df[self.name],bins=self.bins,
                         labels=self.stat['woe'].tolist())
+                labels=labels.astype(float)
             
         return labels  
     
@@ -84,6 +100,7 @@ class woe:
     def optimize(self,depth=2,criterion='gini'):
         clf = DecisionTreeClassifier(criterion='gini',random_state=0,
                                      max_depth=depth)
+        name=self.name
         df=self.df.dropna()
         clf.fit(df['X'][:, None],df['Y'])
         breaks=clf.tree_.threshold[clf.tree_.threshold>-2]
@@ -95,17 +112,20 @@ class woe:
         bins.append(float('Inf'))
         self.bins=bins
         self.fit(self.df['X'],self.df['Y'])
+        self.name=name
         
        
     def massive(self,df,y_name):
      iv = []
      names=[]
-    
+     self.bins=None
+     self.name=None
      for column in df.columns: 
       try:
           self.fit(df[column],df[y_name])
           ivs=self.iv
           self.bins=None
+          self.name=None
       except KeyboardInterrupt:
           raise Exception('Stop by user')
       except: 
