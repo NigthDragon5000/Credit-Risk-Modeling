@@ -4,20 +4,21 @@ Created on Sat Nov  3 10:13:22 2018
 @author: Jair Condori
 """
 
-
 import pandas as pd
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
 
 class woe:
-    def __init__(self,bins=None,nbreaks=10):
+    def __init__(self,bins=None,nbreaks=10,
+                 stat=None,name=None):
         self.bins=bins if bins is None else bins
-        self.stat=None 
+        self.stat=stat 
         self.iv=None
         self.nbreaks=nbreaks
-        self.name=None
+        self.name=name
         self.woe=None
         self.df=None
+        self.per_NA=None
 
 
     def fit(self,x,y):
@@ -54,6 +55,7 @@ class woe:
         self.stat['good_perc']=self.stat['good']/sum(self.stat['good'])
         self.stat['woe'] = np.log(self.stat['good_perc'].values/self.stat['bad_perc'].values)
         self.stat['iv']= (self.stat['good_perc']-self.stat['bad_perc'])*self.stat['woe']               
+        self.stat['per']= self.stat['obs']/sum(self.stat['obs'])
         self.stat['index'] = self.stat.index
         NA=self.stat[self.stat['index'] =='nan']
         self.stat=self.stat[self.stat['index'] !='nan']
@@ -63,7 +65,38 @@ class woe:
         self.stat=pd.concat([self.stat,NA],sort=True)
         self.iv=sum(self.stat['iv']) 
         self.df=df
-     
+        self.per_NA=sum(df['X'].isnull())/len(df)
+        self.stat['z']=self.name
+    
+    def fit_categorical(self,x,y):
+        if not isinstance(x, pd.Series):
+            x = pd.Series(x.compute())
+        if not isinstance(y, pd.Series):
+            y = pd.Series(y.compute())
+            
+        self.name=x.name
+                           
+        df = pd.DataFrame({"X": x, "Y": y, 'order': np.arange(x.size)})
+        col_names = {'count_nonzero': 'bad', 'size': 'obs'}
+        self.stat = df.groupby(["X"])['Y'].agg([np.mean, np.count_nonzero, np.size]).rename(columns=col_names).copy()
+        self.stat['bad_perc']=self.stat['bad']/sum(self.stat['bad'])
+        self.stat['good']=self.stat['obs']-self.stat['bad']
+        self.stat['good_perc']=self.stat['good']/sum(self.stat['good'])
+        self.stat['woe'] = np.log(self.stat['good_perc'].values/self.stat['bad_perc'].values)
+        self.stat['iv']= (self.stat['good_perc']-self.stat['bad_perc'])*self.stat['woe']               
+        self.stat['per']= self.stat['obs']/sum(self.stat['obs'])
+        self.stat['index'] = self.stat.index
+        #NA=self.stat[self.stat['index'] =='nan']
+        #self.stat=self.stat[self.stat['index'] !='nan']
+        #self.stat['index'] = pd.to_numeric(self.stat['index'])
+        #self.stat=self.stat.sort_values('index')
+        #self.stat['breaks']=self.bins[1:len(self.bins)]
+        #self.stat=pd.concat([self.stat,NA],sort=True)
+        self.iv=sum(self.stat['iv']) 
+        self.df=df
+        self.per_NA=sum(df['X'].isnull())/len(df)        
+        
+            
     
     def deploy(self,df):
         ''' Deploy of bins '''
@@ -97,9 +130,13 @@ class woe:
         ''' Plot in function of bad rate'''
         return self.stat.plot(kind='bar',x='breaks',y='mean',color='blue')
     
-    def optimize(self,depth=2,criterion='gini'):
-        clf = DecisionTreeClassifier(criterion='gini',random_state=0,
-                                     max_depth=depth)
+    def optimize(self,depth=2,criterion='gini',
+                 samples=1,max_nodes=None,seed=None):
+        clf = DecisionTreeClassifier(criterion='gini',random_state=seed,
+                                     max_depth=depth,
+                                     min_samples_leaf=samples,
+                                     max_leaf_nodes=max_nodes)
+        df=self.df.dropna()
         name=self.name
         df=self.df.dropna()
         clf.fit(df['X'][:, None],df['Y'])
@@ -113,7 +150,7 @@ class woe:
         self.bins=bins
         self.fit(self.df['X'],self.df['Y'])
         self.name=name
-        
+        self.stat['z']=self.name
        
     def massive(self,df,y_name):
      iv = []
@@ -148,5 +185,48 @@ class woe:
         if self.df['X'].isnull().values.any():
             bins=bins[0:len(bins)-1]
         return np.all(np.diff(bins) > 0) or  np.all(np.diff(bins) < 0)
+    
+    
+    def deploy_frame(self,frame,df):
+        pre_bins=list(frame['breaks'])
+        if pre_bins[-1]==0 or pre_bins[-1]=='nan':
+            pre_bins.pop()
+        bins=[-float('Inf')]
+        bins.extend(pre_bins)
+        name=frame.iloc[0,11]
+        self.bins=bins
+        self.name=name
+        self.stat=frame
+        #w=woe(bins=bins,name=name,stat=frame)
+        return self.deploy(df)
+    
+    @staticmethod
+    def merge(obj,bin1,bin2):
+            binn =  pd.DataFrame({'bad': [obj.iloc[bin2,0]+obj.iloc[bin1,0]],
+                    'bad_perc' :0,
+                    'breaks':obj.iloc[bin1,2],
+                     'good': [obj.iloc[bin2,3]+obj.iloc[bin1,3]],
+                    'good_perc' :0,
+                    'index':obj.iloc[bin1,5],
+                    'iv':0,
+                    'mean':0,
+                    'obs':0,
+                    'per':0,
+                    'woe':0,
+                    'Name':obj.iloc[bin1,11]
+                    })
+            for i in list(range(12)):
+                obj.iloc[0,i]=binn.iloc[0,i]
+            obj.iloc[bin2,0:10]=0
+            obj['obs']=obj['good']+obj['bad']
+            obj['mean']=obj['bad']/obj['obs']
+            obj['good_perc']=obj['good']/sum(obj['good'])
+            obj['bad_perc']=obj['bad']/sum(obj['bad'])
+            obj['woe'] = np.log(obj['good_perc'].values/obj['bad_perc'].values)
+            obj['iv']= (obj['good_perc']-obj['bad_perc'])*obj['woe']               
+            obj['per']= obj['obs']/sum(obj['obs'])
+            obj['woe'][5]=obj['woe'][0]
+            return obj
+
 
 
