@@ -179,6 +179,53 @@ class woe:
      ivss['iv']=ivss['iv'].astype(float)
      ivss.plot(kind='bar',x='names',y='iv',color='red')
      return(ivss)
+    
+    def massive2(self,df,y_name,plot=False):
+          
+     frames=[]
+     names=[]
+     iv=[]
+     monotonic=[]
+#     lista=[]
+     per_NA = []
+     depth_arbol=[]
+#for i in train.iloc[:,0:20].columns.tolist():
+     for i in df.columns.tolist():
+         try :
+            # w=woe(nbreaks=10)
+             self.bins=None
+             self.name=None  
+             self.stat=None
+             self.nbreaks=10
+             self.fit(df[i],df[y_name])
+             
+             for j in list(range(1,4)):
+                 self.optimize(depth=j,samples=int(round(len(df)*0.05)),max_nodes=5,seed=0) # Minimo por leaf min_sample_leaf
+                 if self._checkMonotonic() and self.iv != float('Inf') and self.iv >0.02:
+                     frames.append(self.stat)
+                     names.append(i)
+                     iv.append(self.iv)
+                     monotonic.append(self._checkMonotonic())
+                     per_NA.append(self.per_NA)
+                     depth_arbol.append(j)
+#              train[str(i+'_binned')]=w.deploy(train)
+#              test[str(i+'_binned')]=w.deploy(test)              
+         except KeyboardInterrupt:
+             raise Exception('Stop by user')
+         except:
+             pass
+    
+     dm =  pd.DataFrame({'Names':names, 'IV':iv, 'Monotono' : monotonic\
+                         ,'per_NA': per_NA,'depth':depth_arbol})
+    # if plot :
+    #     dm.plot(kind='bar',x='Names',y='IV',color='red')
+    # Seleccionando los maximos IV con minima profundad de arbol
+     some_values=dm.groupby('Names')['IV'].max()
+     g=dm.loc[dm['IV'].isin(some_values)]
+     h=g.groupby('Names')[['depth','Names']].min()
+     dm=pd.merge(g,h, on=['depth','Names'])
+     return(dm)
+ 
      
     def _checkMonotonic(self):
         bins=np.asarray(self.stat['mean'].values)
@@ -227,6 +274,5 @@ class woe:
             obj['per']= obj['obs']/sum(obj['obs'])
             obj['woe'][5]=obj['woe'][0]
             return obj
-
 
 
