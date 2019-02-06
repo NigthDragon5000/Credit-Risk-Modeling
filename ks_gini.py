@@ -5,7 +5,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 #os.chdir("D:/")
 
-base  = pd.read_csv("b.csv")
+#base  = pd.read_csv("b.csv")
 
 def ks(test,pred):
     data =  pd.DataFrame({'bad':test, 'score':pred})
