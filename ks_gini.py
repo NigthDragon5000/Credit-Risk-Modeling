@@ -3,6 +3,10 @@ import pandas as pd
 from scipy import stats
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
+import matplotlib.pyplot as plt
+import numpy as np
+
+
 #os.chdir("D:/")
 
 #base  = pd.read_csv("b.csv")
@@ -41,4 +45,26 @@ def gini(test,pred,plot=False):
         plt.show()
         
     return logit_roc_auc_train,logit_roc_auc_train*2-1
+
+
+def Find_Optimal_Cutoff(test, pred):
+    """ Find the optimal probability cutoff point for a classification model related to event rate
+    Parameters
+    ----------
+    target : Matrix with dependent or target data, where rows are observations
+
+    predicted : Matrix with predicted data, where rows are observations
+
+    Returns
+    -------     
+    list type, with optimal cutoff value
+
+    """
+    fpr, tpr, threshold = roc_curve(test, pred)
+    i = np.arange(len(tpr)) 
+    roc = pd.DataFrame({'tf' : pd.Series(tpr-(1-fpr), index=i), 'threshold' : pd.Series(threshold, index=i)})
+    roc_t = roc.ix[(roc.tf-0).abs().argsort()[:1]]
+
+    return list(roc_t['threshold']) 
+
 
