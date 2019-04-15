@@ -68,3 +68,41 @@ def Find_Optimal_Cutoff(test, pred):
     return list(roc_t['threshold']) 
 
 
+def psi(df1,df2,var,nbreaks=10):
+    '''
+    df1: Muestra Original
+    df2: Muestra a Probar
+    var: Variable de interes
+    nbreaks: Número de Cortes para el percentil
+    Retorna una lista con [0] siendo la tabla y [1] el psi total'''
+    #Cortamos en n percentiles
+    breaks=pd.qcut(df1[var],nbreaks,duplicates='drop',retbins=True)[1]
+    # Excluimos el mínimo y el máximo
+    breaks=breaks[1:-1]
+    # Rutina para añadir -Inf e Inf
+    bins=[]
+    bins.append(-float('Inf'))
+    for i in breaks:
+        bins.append(i)
+    bins.append(float('Inf'))
+    # Determinamos una etiqueta para cada fila
+    q = pd.cut(df1[var], bins=bins,
+                   labels=np.arange(len(bins)-1).astype(int))
+    df1['labels']=q.astype(str)
+    #Creamos tabla de cálculo
+    col_names = {'amin':'minimo','amax':'maximo','size': 'obs'}
+    tabla1 = df1.groupby(["labels"])[var].agg([np.min,np.max,np.size]).rename(columns=col_names).copy()
+    tabla1['per_bin'] = tabla1['obs']/sum(tabla1['obs'])
+    #Determinamos etiquetas para la segunda tabla
+    q = pd.cut(df2[var], bins=bins,
+                   labels=np.arange(len(bins)-1).astype(int))
+    df2['labels']=q.astype(str)
+    col_names = {'amin':'minimo','amax':'maximo','size': 'obs2'}
+    tabla2 = df2.groupby(["labels"])[var].agg([np.min,np.max,np.size]).rename(columns=col_names).copy()
+    tabla2['per_bin2'] = tabla2['obs2']/sum(tabla2['obs2'])
+    #Uniendo en una sola tabla y calculando PSI
+    tabla3=pd.concat([tabla1,tabla2[['obs2','per_bin2']]],axis=1)
+    #a$PSI <- (a$relFreq-a$relFreq2)*log(a$relFreq/a$relFreq2)
+    tabla3['psi']=(tabla3['per_bin']-tabla3['per_bin2'])*np.log(tabla3['per_bin']/tabla3['per_bin2'])
+    return tabla3,sum(tabla3['psi'])
+
