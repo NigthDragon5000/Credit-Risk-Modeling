@@ -106,3 +106,17 @@ def psi(df1,df2,var,nbreaks=10):
     tabla3['psi']=(tabla3['per_bin']-tabla3['per_bin2'])*np.log(tabla3['per_bin']/tabla3['per_bin2'])
     return tabla3,sum(tabla3['psi'])
 
+
+def massive_psi(df1,df2,nbreaks=10):
+    psis=[]
+    for column in df1.columns:
+        try:
+            res=psi(df1,df2,column,nbreaks)[1]
+            psis.append([column,"{0:.6f}".format(res)])
+        except KeyboardInterrupt:
+            raise Exception('Stop by user')
+        except: 
+            pass
+    return psis
+
+
