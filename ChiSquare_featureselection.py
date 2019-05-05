@@ -52,14 +52,13 @@ class ChiSquare:
 
 
 df = pd.pandas.read_csv("train_titanic.csv")
-df['dummyCat'] = np.random.choice([0, 1], size=(len(df),), p=[0.5, 0.5])
 
-#Initialize ChiSquare Class
 cT = ChiSquare(df)
+cT.globalTest('Survived')
 
-#Feature Selection
-#testColumns = ['Sex','Embarked','Cabin','Pclass','Age','Name','dummyCat']
-#for var in testColumns:
-#    cT.TestIndependence(colX=var,colY="Survived" )  
+cT.TestIndependence('Pclass','Survived')
+print(cT.dfObserved.T)
+print(cT.dfExpected.T)
 
-cT.globalTest('species')
+
+
