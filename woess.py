@@ -151,48 +151,19 @@ class woe:
         self.fit(self.df['X'],self.df['Y'])
         self.name=name
         self.stat['z']=self.name
-       
-    def massive(self,df,y_name):
-     iv = []
-     names=[]
-     self.bins=None
-     self.name=None
-     for column in df.columns: 
-      try:
-          self.fit(df[column],df[y_name])
-          ivs=self.iv
-          self.bins=None
-          self.name=None
-      except KeyboardInterrupt:
-          raise Exception('Stop by user')
-      except: 
-          ivs=0      
-      names.append(column)
-      iv.append(ivs)
+ 
 
-     iv=np.array(iv)
-     iv=np.transpose(iv)
-     names=np.array(names)
-     names=np.transpose(names)
-     massive=np.concatenate((iv.reshape(-1,1),names.reshape(-1,1)),axis=1)
-     ivss = pd.DataFrame({'iv':massive[:,0],'names':massive[:,1]})
-     ivss['iv']=ivss['iv'].astype(float)
-     ivss.plot(kind='bar',x='names',y='iv',color='red')
-     return(ivss)
-    
-    def massive2(self,df,y_name,plot=False, deploy = False,train=None,\
-                 test=None,min_sample=0.05,min_iv=0.02):
+    def massive(self,df,y_name,plot=False, deploy = False,train=None,\
+                 test=None,len_samples=[0.05,0.10,0.20,0.25],min_iv=0.02):
      
-    
+     '''Return a tuple with index 0 that have IV and index 1 that have tables of woes '''
      frames=[]
      names=[]
      iv=[]
      monotonic=[]
-#     lista=[]
      per_NA = []
      depth_arbol=[]
      tablas=[]
-#for i in train.iloc[:,0:20].columns.tolist():
      for i in df.columns.tolist():
          try :
             # w=woe(nbreaks=10)
@@ -203,19 +174,20 @@ class woe:
              self.fit(df[i],df[y_name])
              iv_prev=0
              for j in list(range(1,4)):
-                 self.optimize(depth=j,samples=int(round(len(df)*min_sample)),max_nodes=5,seed=0) # Minimo por leaf min_sample_leaf
-                 if self._checkMonotonic() and self.iv != float('Inf') and self.iv >min_iv and self.iv>iv_prev:
-                     frames.append(self.stat)
-                     names.append(i)
-                     iv.append(self.iv)
-                     monotonic.append(self._checkMonotonic())
-                     per_NA.append(self.per_NA)
-                     depth_arbol.append(j)
-                     tablas.append(self.stat)
-                     iv_prev=self.iv
-                     if deploy:
-                         train[str(i+'_binned')]=self.deploy(train)
-                         test[str(i+'_binned')]=self.deploy(test) 
+                 for sample in len_samples:
+                     self.optimize(depth=j,samples=int(round(len(df)*sample)),max_nodes=5,seed=0) # Minimo por leaf min_sample_leaf
+                     if self._checkMonotonic() and self.iv != float('Inf') and self.iv >min_iv and self.iv>iv_prev:
+                         frames.append(self.stat)
+                         names.append(i)
+                         iv.append(self.iv)
+                         monotonic.append(self._checkMonotonic())
+                         per_NA.append(self.per_NA)
+                         depth_arbol.append(j)
+                         tablas.append(self.stat)
+                         iv_prev=self.iv
+                         if deploy:
+                             train[str(i+'_binned')]=self.deploy(train)
+                             test[str(i+'_binned')]=self.deploy(test) 
 
          except KeyboardInterrupt:
              raise Exception('Stop by user')
@@ -237,7 +209,6 @@ class woe:
          dm.plot(kind='bar',x='Names',y='IV',color='red')
 
      return(dm,tablas)
- 
  
      
     def _checkMonotonic(self):
