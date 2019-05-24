@@ -151,9 +151,132 @@ class woe:
         self.fit(self.df['X'],self.df['Y'])
         self.name=name
         self.stat['z']=self.name
- 
-
+       
+    
     def massive(self,df,y_name,plot=False, deploy = False,train=None,\
+                 test=None,len_samples=[0.05,0.10,0.20,0.25],\
+                 nodes=[2,3,4,5],min_iv=0.02):
+     
+     '''Return a tuple with index 0 that have IV and index 1 that have tables of woes '''
+     frames=[]
+     names=[]
+     iv=[]
+     monotonic=[]
+     per_NA = []
+     depth_arbol=[]
+     tablas=[]
+     for i in df.columns.tolist():
+         try :
+            # w=woe(nbreaks=10)
+             self.bins=None
+             self.name=None  
+             self.stat=None
+             self.nbreaks=5
+             self.fit(df[i],df[y_name])
+             iv_prev=0
+             tablas.append('')
+             for j in list(range(1,4)):
+                 for sample in len_samples:
+                     for node in nodes:
+                         self.optimize(depth=j,samples=int(round(len(df)*sample)),max_nodes=node,seed=0) # Minimo por leaf min_sample_leaf
+                         if self._checkMonotonic() and self.iv != float('Inf') and self.iv >min_iv and self.iv>iv_prev:
+                             frames.append(self.stat)
+                             names.append(i)
+                             iv.append(self.iv)
+                             monotonic.append(self._checkMonotonic())
+                             per_NA.append(self.per_NA)
+                             depth_arbol.append(j)
+                             tablas[-1] = self.stat
+                             iv_prev=self.iv
+                             if deploy:
+                                 train[str(i+'_binned')]=self.deploy(train)
+                                 test[str(i+'_binned')]=self.deploy(test) 
+
+         except KeyboardInterrupt:
+             raise Exception('Stop by user')
+         except:
+             pass
+    
+     dm =  pd.DataFrame({'Names':names, 'IV':iv, 'Monotono' : monotonic\
+                         ,'per_NA': per_NA,'depth':depth_arbol})
+
+    # Seleccionando los maximos IV con minima profundad de arbol
+    
+     some_values=dm.groupby('Names')['IV'].max()
+     g=dm.loc[dm['IV'].isin(some_values)]
+     h=g.groupby('Names')[['depth','Names']].min()
+     dm=pd.merge(g,h, on=['depth','Names'])
+     
+   # Filtrando campos vacios en tablas
+     contenedor=[]
+     for tabla in tablas:
+        try:
+            if tabla.empty==False:
+                contenedor.append(tabla)
+        except:
+            pass
+
+     
+   # Ploteando
+     if plot :
+         dm.plot(kind='bar',x='Names',y='IV',color='red')
+
+     return(dm,contenedor)
+ 
+     
+    def _checkMonotonic(self):
+        bins=np.asarray(self.stat['mean'].values)
+        if self.df['X'].isnull().values.any():
+            bins=bins[0:len(bins)-1]
+        return np.all(np.diff(bins) > 0) or  np.all(np.diff(bins) < 0)
+    
+    
+    def deploy_frame(self,frame,df):
+        pre_bins=list(frame['breaks'])
+        if pre_bins[-1]==0 or str(pre_bins[-1])=='nan':
+            pre_bins.pop()
+        bins=[-float('Inf')]
+        bins.extend(pre_bins)
+        name=frame.iloc[0,11]
+        
+        self.df = pd.DataFrame()       
+        self.bins=bins
+        self.name=name
+        self.stat=frame
+        self.df['X']=df[self.name]
+
+        return self.deploy(df)
+    
+    @staticmethod
+    def merge(obj,bin1,bin2):
+            binn =  pd.DataFrame({'bad': [obj.iloc[bin2,0]+obj.iloc[bin1,0]],
+                    'bad_perc' :0,
+                    'breaks':obj.iloc[bin1,2],
+                     'good': [obj.iloc[bin2,3]+obj.iloc[bin1,3]],
+                    'good_perc' :0,
+                    'index':obj.iloc[bin1,5],
+                    'iv':0,
+                    'mean':0,
+                    'obs':0,
+                    'per':0,
+                    'woe':0,
+                    'z':obj.iloc[bin1,11]
+                    })
+            for i in list(range(12)):
+                obj.iloc[bin1,i]=binn.iloc[0,i]
+            obj.iloc[bin2,0:10]=0
+            obj['obs']=obj['good']+obj['bad']
+            obj['mean']=obj['bad']/obj['obs']
+            obj['good_perc']=obj['good']/sum(obj['good'])
+            obj['bad_perc']=obj['bad']/sum(obj['bad'])
+            obj['woe'] = np.log(obj['good_perc'].values/obj['bad_perc'].values)
+            obj['iv']= (obj['good_perc']-obj['bad_perc'])*obj['woe']               
+            obj['per']= obj['obs']/sum(obj['obs'])
+            obj['woe'][bin2]=obj['woe'][bin1]
+            return obj
+
+
+    def massive2(self,df,y_name,plot=False, deploy = False,train=None,\
                  test=None,len_samples=[0.05,0.10,0.20,0.25],min_iv=0.02):
      
      '''Return a tuple with index 0 that have IV and index 1 that have tables of woes '''
@@ -173,21 +296,19 @@ class woe:
              self.nbreaks=5
              self.fit(df[i],df[y_name])
              iv_prev=0
+             tablas.append('')
              for j in list(range(1,4)):
                  for sample in len_samples:
                      self.optimize(depth=j,samples=int(round(len(df)*sample)),max_nodes=5,seed=0) # Minimo por leaf min_sample_leaf
-                     if self._checkMonotonic() and self.iv != float('Inf') and self.iv >min_iv and self.iv>iv_prev:
+                     if self.iv >min_iv and self.iv>iv_prev:
                          frames.append(self.stat)
                          names.append(i)
                          iv.append(self.iv)
                          monotonic.append(self._checkMonotonic())
                          per_NA.append(self.per_NA)
                          depth_arbol.append(j)
-                         tablas.append(self.stat)
+                         tablas[-1] = self.stat
                          iv_prev=self.iv
-                         if deploy:
-                             train[str(i+'_binned')]=self.deploy(train)
-                             test[str(i+'_binned')]=self.deploy(test) 
 
          except KeyboardInterrupt:
              raise Exception('Stop by user')
@@ -204,59 +325,18 @@ class woe:
      h=g.groupby('Names')[['depth','Names']].min()
      dm=pd.merge(g,h, on=['depth','Names'])
      
+   # Filtrando campos vacios en tablas
+     contenedor=[]
+     for tabla in tablas:
+        try:
+            if tabla.empty==False:
+                contenedor.append(tabla)
+        except:
+            pass
+
+     
    # Ploteando
      if plot :
          dm.plot(kind='bar',x='Names',y='IV',color='red')
 
-     return(dm,tablas)
- 
-     
-    def _checkMonotonic(self):
-        bins=np.asarray(self.stat['mean'].values)
-        if self.df['X'].isnull().values.any():
-            bins=bins[0:len(bins)-1]
-        return np.all(np.diff(bins) > 0) or  np.all(np.diff(bins) < 0)
-    
-    
-    def deploy_frame(self,frame,df):
-        pre_bins=list(frame['breaks'])
-        if pre_bins[-1]==0 or pre_bins[-1]=='nan':
-            pre_bins.pop()
-        bins=[-float('Inf')]
-        bins.extend(pre_bins)
-        name=frame.iloc[0,11]
-        self.bins=bins
-        self.name=name
-        self.stat=frame
-        #w=woe(bins=bins,name=name,stat=frame)
-        return self.deploy(df)
-    
-    @staticmethod
-    def merge(obj,bin1,bin2):
-            binn =  pd.DataFrame({'bad': [obj.iloc[bin2,0]+obj.iloc[bin1,0]],
-                    'bad_perc' :0,
-                    'breaks':obj.iloc[bin1,2],
-                     'good': [obj.iloc[bin2,3]+obj.iloc[bin1,3]],
-                    'good_perc' :0,
-                    'index':obj.iloc[bin1,5],
-                    'iv':0,
-                    'mean':0,
-                    'obs':0,
-                    'per':0,
-                    'woe':0,
-                    'Name':obj.iloc[bin1,11]
-                    })
-            for i in list(range(12)):
-                obj.iloc[0,i]=binn.iloc[0,i]
-            obj.iloc[bin2,0:10]=0
-            obj['obs']=obj['good']+obj['bad']
-            obj['mean']=obj['bad']/obj['obs']
-            obj['good_perc']=obj['good']/sum(obj['good'])
-            obj['bad_perc']=obj['bad']/sum(obj['bad'])
-            obj['woe'] = np.log(obj['good_perc'].values/obj['bad_perc'].values)
-            obj['iv']= (obj['good_perc']-obj['bad_perc'])*obj['woe']               
-            obj['per']= obj['obs']/sum(obj['obs'])
-            obj['woe'][5]=obj['woe'][0]
-            return obj
-
-
+     return(dm,contenedor)
