@@ -120,3 +120,44 @@ def massive_psi(df1,df2,nbreaks=10):
     return psis
 
 
+''' Backward Elimination '''
+
+def backwardElimination(Y, X, sl,frame=False,test=False,dftest=None):
+    numVars = len(X.columns)
+    for i in range(0, numVars):
+        X = sm.add_constant(X)
+        regressor = sm.Logit(Y, X).fit()
+        if frame:
+            print(regressor.summary())
+        maxVar = max(regressor.pvalues)#.astype(float)
+        if maxVar > sl:
+            for name in regressor.pvalues.index:
+                if (regressor.pvalues[name].astype(float) == maxVar) and name!='const': #\
+               # and name!='const':
+                    X=X.drop([name],axis=1)
+                    if test:
+                        dftest=dftest.drop([name],axis=1)
+    return X,dftest
+
+
+''' Funcion para eliminar correlacion '''
+
+def eliminate_corr(df):
+    corr=df.corr()
+    columns = np.full((corr.shape[0],), True, dtype=bool)
+    for i in range(corr.shape[0]):
+        for j in range(i+1, corr.shape[0]):
+            if abs(corr.iloc[i,j]) == 1:
+                if columns[j]:
+                    columns[j] = False
+    selected_columns = df.columns[columns]
+    return selected_columns
+
+''' Funcion para escribir xlsx'''
+
+def save_xls(list_dfs, xls_path):
+    with ExcelWriter(xls_path) as writer:
+        for n, df in enumerate(list_dfs):
+            df.to_excel(writer,'sheet%s' % n)
+        writer.save()
+
