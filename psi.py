@@ -38,6 +38,7 @@ class psi():
             for i in breaks:
                 bins.append(i)
             bins.append(float('Inf'))
+            self.bins=bins
         else:
             bins=self.bins
         
