@@ -15,6 +15,9 @@ from statsmodels.stats.stattools import durbin_watson
 from scipy.stats import shapiro
 from statsmodels.stats.diagnostic import het_white
 import matplotlib.pyplot as plt
+import statsmodels.tsa.api as smt
+import numpy as np
+
     
 
 def get_month(x):
@@ -101,18 +104,21 @@ def error_analisis(result,plot=False):
     
     print('--------Breusch Autocorr-----------')
 
-    bre=acorr_breusch_godfrey(result,nlags=12)
-
-    print('lm: '+str(bre[0]))
-    print('lmpval: '+str(bre[1]))
-    print('fval: '+str(bre[2]))
-    print('fpval: '+str(bre[3]))
+    try:
+        bre=acorr_breusch_godfrey(result,nlags=12)
     
-    if bre[1] < 0.05:
-        print('Evidence for autocorrelation')
-    else:
-        print('Not Evidence for autocorrelation')
+        print('lm: '+str(bre[0]))
+        print('lmpval: '+str(bre[1]))
+        print('fval: '+str(bre[2]))
+        print('fpval: '+str(bre[3]))
     
+        if bre[1] < 0.05:
+            print('Evidence for autocorrelation')
+        else:
+            print('Not Evidence for autocorrelation')
+    except:
+        print('Cant calculate statistic')
+        
     
     print('-----White Heteroskedasticity------')
     
@@ -147,4 +153,43 @@ def error_analisis(result,plot=False):
         residuals.plot(kind='kde')
         plt.show()
             
+
+
+def tm_plot(train,test,pred_train,pred_test,lags=24):
+    plt.figure()
+    plt.plot(train[-lags:], label='training')
+    plt.plot(test, label='test')
+    plt.plot(pred_train[-lags:], label='forecast in sample')
+    plt.plot(pred_test, label='forecast')
+    plt.title('Forecast vs Actuals')
+    plt.legend(loc='upper left', fontsize=8)
+    plt.show()
+    
+    
+def ac(result,lags=12,alpha=0.05):
+    pacf = smt.graphics.plot_pacf(result.resid, lags=lags , alpha=alpha)
+    pacf.show()
+    
+    acf = smt.graphics.plot_acf(result.resid, lags=lags , alpha=alpha)
+    acf.show()
+
+
+def forecast_accuracy(forecast, actual):
+    mape = np.mean(np.abs(forecast - actual)/np.abs(actual))  # MAPE
+    me = np.mean(forecast - actual)             # ME
+    mae = np.mean(np.abs(forecast - actual))    # MAE
+    mpe = np.mean((forecast - actual)/actual)   # MPE
+    rmse = np.mean((forecast - actual)**2)**.5  # RMSE
+    corr = np.corrcoef(forecast, actual)[0,1]   # corr
+    mins = np.amin(np.hstack([forecast[:,None], 
+                              actual[:,None]]), axis=1)
+    maxs = np.amax(np.hstack([forecast[:,None], 
+                              actual[:,None]]), axis=1)
+    minmax = 1 - np.mean(mins/maxs)             # minmax
+    #acf1 = acf(fc-test)[1]                      # ACF1
+    return({'1-mape':1-mape, 'me':me, 'mae': mae, 
+            'mpe': mpe, 'rmse':rmse,# 'acf1':acf1, 
+            'corr':corr, 'minmax':minmax})
+
+
 
