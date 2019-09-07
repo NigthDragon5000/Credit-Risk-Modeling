@@ -17,17 +17,49 @@ from statsmodels.stats.diagnostic import het_white
 import matplotlib.pyplot as plt
 import statsmodels.tsa.api as smt
 import numpy as np
+import statsmodels.api as sm
+from datetime import datetime
 
     
+#
+#def get_month(x):
+#    if x=='Ene':
+#        y=1
+#    elif x=='Feb':
+#        y=2
+#    elif x=='Mar':
+#        y=3
+#    elif x=='Abr':
+#        y=4
+#    elif x=='May':
+#        y=5
+#    elif x=='Jun':
+#        y=6
+#    elif x=='Jul':
+#        y=7
+#    elif x=='Ago':
+#        y=8
+#    elif x=='Sep':
+#        y=9
+#    elif x=='Oct':
+#        y=10
+#    elif x=='Nov':
+#        y=11
+#    elif x=='Dic':
+#        y=12
+#    else:
+#        y=0
+#    return y
+
 
 def get_month(x):
-    if x=='Ene':
+    if x=='Jan':
         y=1
     elif x=='Feb':
         y=2
     elif x=='Mar':
         y=3
-    elif x=='Abr':
+    elif x=='Apr':
         y=4
     elif x=='May':
         y=5
@@ -35,7 +67,7 @@ def get_month(x):
         y=6
     elif x=='Jul':
         y=7
-    elif x=='Ago':
+    elif x=='Aug':
         y=8
     elif x=='Sep':
         y=9
@@ -43,12 +75,11 @@ def get_month(x):
         y=10
     elif x=='Nov':
         y=11
-    elif x=='Dic':
+    elif x=='Dec':
         y=12
     else:
         y=0
     return y
-
 
 
 def monthly_dummie(df):
@@ -63,9 +94,11 @@ def monthly_dummie(df):
     integer_encoded = label_encoder.fit_transform(df['month_number'])
     onehot_encoder = OneHotEncoder(sparse=False)
     integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
-    onehot_encoded = onehot_encoder.fit_transform(integer_encoded)   
+    onehot_encoded = onehot_encoder.fit_transform(integer_encoded) 
+    df.reset_index(inplace=True)
     df=pd.concat([df,pd.DataFrame(onehot_encoded)],axis=1)
-    df.drop('month_number',axis=1)
+    df.set_index('index',inplace=True)
+    #df.drop('month_number',axis=1)
     return df
 
 
@@ -192,4 +225,53 @@ def forecast_accuracy(forecast, actual):
             'corr':corr, 'minmax':minmax})
 
 
+
+def back_elimination(Y, X, alpha=0.05,frame=False,test=False,dftest=None,kind='ols'):
+    numVars = len(X.columns)
+    for i in range(0, numVars):
+        X = sm.add_constant(X)
+        if kind=='logit':
+            regressor = sm.Logit(Y, X).fit()
+        elif kind=='ols':
+            regressor = sm.OLS(Y, X).fit()
+            
+        if frame:
+            print(regressor.summary())
+        maxVar = max(regressor.pvalues[1:])#.astype(float)
+        if maxVar > alpha:
+            for name in regressor.pvalues.index:
+                if (regressor.pvalues[name].astype(float) == maxVar) and name!='const': #\
+               # and name!='const':
+                    X=X.drop([name],axis=1)
+                    if test:
+                        dftest=dftest.drop([name],axis=1)
+    print(regressor.summary())
+    return X,dftest
+    
+
+
+def month_list(first_month,end_month):
+    dates = [first_month, end_month]
+    start, end = [datetime.strptime(_, "%Y-%m-%d") for _ in dates]
+    total_months = lambda dt: dt.month + 12 * dt.year
+    mlist = []
+    for tot_m in range(total_months(start)-1, total_months(end)):
+        y, m = divmod(tot_m, 12)
+        mlist.append(datetime(y, m+1, 1).strftime("%b-%y"))
+    return mlist
+
+def month(df):
+    month=df['months'].str[:3]
+    return month
+
+def encode_month(df):
+    df['month']=month(df)
+    df=monthly_dummie(df)
+    return df
+
+def add_constant(df):
+    df['const']=1
+    return df
+
+    
 
