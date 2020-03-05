@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Created on Fri Sep  6 10:37:52 2019
 
@@ -82,16 +83,16 @@ def get_month(x):
     return y
 
 
-def monthly_dummie(df):
+def monthly_dummie(df,month_number):
     '''
     Inputs:
         df : Data Frame, must hace a column with Month variables in format Ene,Feb,Sep...
     Returns:
         A Data Frame with months in one hot encode format
     '''
-    df['month_number']=df.apply(lambda row: get_month(row['month']),axis=1)       
+    #df['month_number']=df.apply(lambda row: get_month(row['month']),axis=1)       
     label_encoder = LabelEncoder()
-    integer_encoded = label_encoder.fit_transform(df['month_number'])
+    integer_encoded = label_encoder.fit_transform(df[month_number])
     onehot_encoder = OneHotEncoder(sparse=False)
     integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
     onehot_encoded = onehot_encoder.fit_transform(integer_encoded) 
@@ -167,7 +168,10 @@ def error_analisis(result,plot=False):
     
     
     print('----------ADF Test-----------------')
-    DFtest(result.resid)
+    try:
+        DFtest(result.resid)
+    except:
+        print("Can't calculate ADF test")
     
     
     print('----------Shapiro Normality--------')
@@ -226,13 +230,13 @@ def forecast_accuracy(forecast, actual):
 
 
 
-def back_elimination(Y, X, alpha=0.05,frame=False,test=False,dftest=None,kind='ols'):
+def back_elimination(Y, X, alpha=0.05,frame=False,test=False,dftest=None,kind='robust'):
     numVars = len(X.columns)
     for i in range(0, numVars):
         X = sm.add_constant(X)
-        if kind=='logit':
-            regressor = sm.Logit(Y, X).fit()
-        elif kind=='ols':
+        if kind=='robust':
+            regressor = sm.OLS(Y, X).fit(cov_type='HC3')
+        elif kind=='no_robust':
             regressor = sm.OLS(Y, X).fit()
             
         if frame:
@@ -246,7 +250,7 @@ def back_elimination(Y, X, alpha=0.05,frame=False,test=False,dftest=None,kind='o
                     if test:
                         dftest=dftest.drop([name],axis=1)
     print(regressor.summary())
-    return X,dftest
+    return regressor,X
     
 
 
@@ -274,4 +278,20 @@ def add_constant(df):
     return df
 
     
+
+def rezagar(df,n=2,diferencias=False):
+    
+    if diferencias :
+        for variable in  df.columns:
+            df[variable+'_diff']=df[variable].diff()
+    else:
+        pass
+
+    for variable in df.columns:
+        for i  in range(1,n):
+            df['_'+str(i)+str(variable)]=df[variable].shift(i)
+    return df
+
+
+
 
